@@ -1,10 +1,17 @@
 {
   "name": "@mh-cbon/yasudo",
   "version": "1.0.0",
-  "description": "yet another sudo command wrapper",
+  "description": "yet another sudo command helper",
   "main": "index.js",
   "scripts": {
-    "test": "mocha tests/"
+    "test": "mocha tests/",
+    "patch": "npm version patch -m \"patch %s\"",
+    "minor": "npm version minor -m \"minor %s\"",
+    "major": "npm version major -m \"major %s\"",
+    "preversion": "echo \"npm test: not defined\"",
+    "version": "echo \"npm run build: not defined\"",
+    "postversion": "git push && git push --tags && npm run public",
+    "public": "npm publish --access=public"
   },
   "keywords": [
     "sudo"
