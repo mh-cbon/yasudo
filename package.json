@@ -1,0 +1,22 @@
+{
+  "name": "@mh-cbon/yasudo",
+  "version": "1.0.0",
+  "description": "yet another sudo command wrapper",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha tests/"
+  },
+  "keywords": [
+    "sudo"
+  ],
+  "author": "mh-cbon <mh-cbon@users.noreply.github.com>",
+  "license": "MIT",
+  "dependencies": {
+    "debug": "^2.2.0",
+    "inpath": "^1.0.2",
+    "randomstring": "^1.1.4"
+  },
+  "devDependencies": {
+    "should": "^8.3.1"
+  }
+}
