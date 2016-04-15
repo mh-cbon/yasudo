@@ -55,10 +55,10 @@ require('@mh-cbon/yasudo')('ls', ['-al'])
 It works by echoing a `token` on `stdout` and later detects it to determine that `sudo` succeeded.
 
 for sure,
-- it does not rely on the output content to detect success/failure
+- it does not rely on the output content of `sudo` to detect success/failure
 - it does not clutter your output with my token
 - it respects `stdio` settings such as `inherit` and `ignore`
-- it works seamlessly, even for `stdin`, see [this example](dfdsf)
+- it works seamlessly, even for `stdin`, see [this example](blob/master/examples/stdin.js)
 
 # Todo
 
