@@ -19,8 +19,9 @@ function sudo(bin, args, options) {
     var options = options || {};
     var origStdio = JSON.parse(JSON.stringify(options.stdio || false))
     // normalize the stdio options to something we can actually manage
-    // preferable use inherit for stdin / stderr (because sudo use those two, so if possible let the system manages it)
-    // stdout is always pipe, to be able to catch the token on it
+    // - preferably use inherit for stdin / stderr (
+    //    because sudo use those two, so if possible let the system manages it
+    // - stdout is always pipe, to be able to catch the token on it
     if(options.stdio) {
       if (options.stdio==='inherit') options.stdio = ['inherit', 'pipe', 'inherit']
       else if (options.stdio==='ignore') options.stdio = ['inherit', 'pipe', 'inherit'] // we cant really ignore.
@@ -35,14 +36,14 @@ function sudo(bin, args, options) {
     debug('origStdio %j', origStdio)
     debug('options %j', options)
 
-    // linearize the command bin to do : sudo sh -c 'your command'
+    // linearize the command bin to -> sudo sh -c 'your command'
     var command = '' + bin + ' ';
     args.forEach(function (arg){
       command += arg.match(/\s/) ? '"' + arg + '"' : arg;
       command += ' ';
     })
 
-    // injecct the toen to detect successfull sudo into your command
+    // inject the token into your command to detect successful sudo,
     // such : sudo sh -c 'echo THETOKEN && your command'
     var args = [ '-S', 'sh', '-c', 'echo "' + token + '" && ' + command ];
     // some various sudo options, see man sudo
@@ -78,7 +79,7 @@ function sudo(bin, args, options) {
 
     var fake = new FakeChildProcess(child, options);
 
-    // Listener to catch the token on stdout, tells that sudo was successfull
+    // Listener to catch the token on stdout, tells us that sudo was successful
     child.stdout.on('data', function challengeSuccess(d) {
       if(d.toString().match(token)) {
         debug('hasSolvedTheChallenge %j', true)
@@ -94,8 +95,8 @@ function sudo(bin, args, options) {
 
     // Automatic pasword typing
     if(options.password) {
-      var waitToInputPwd; // Wait stderr does not have activity anymore.
-      var hasEnded = false; // if it fails, at some point the stream ends, we should then stop to write it.
+      var waitToInputPwd; // Wait that stderr does not have activity anymore.
+      var hasEnded = false; // if sudo fails, the stream ends, we should then stop to write on stdin.
       var askForChallenge = function (d) {
         clearTimeout(waitToInputPwd);
         waitToInputPwd = setTimeout(function () {
@@ -122,8 +123,8 @@ function sudo(bin, args, options) {
 
     } else if(options.stdio[0]==="pipe"){
 
-      var hasEnded = false; // if it fails, at some point the stream ends, we should then stop to write it.
-      // Mutable stream to not show the password while the user types it
+      var hasEnded = false; // if it fails, the stream ends, we should then stop to write on stdin.
+      // Mutable stream to hide the password while the user types it
       var waitToResumeInput;
       var Writable = require('stream').Writable;
       var mutableStdout = new Writable({
@@ -153,7 +154,7 @@ function sudo(bin, args, options) {
       }
       child.stderr.on('data', muter)
 
-      // forward typed in data (the password) to the sudo child
+      // forward typed in data (the password) to the sudo process
       var writeProcessStdin = function (d) {
         if(!hasEnded){
           d = d.toString();
@@ -175,18 +176,20 @@ function sudo(bin, args, options) {
       })
     }
 
-    if(!options.password && options.stdio[2]==="pipe"){ // required to show the prompt
+    // required to show the prompt when the password is to provide by hand
+    if(!options.password && options.stdio[2]==="pipe") {
       child.stderr && child.stderr.pipe(process.stderr);
     }
 
-    if(origStdio==='inherit'){ // simulate inherit option
+    // simulate inherit option
+    if(origStdio==='inherit'){
       child.once('success', function () {
         child.stdout && child.stdout.pipe(process.stdout);
       })
     }
 
+    // a fake child with customs stdio streams
     function FakeChildProcess(c, options){
-      // it expects normaized sdtio options
       if(origStdio===false || (origStdio && (origStdio==='pipe' || options==='pipe'))) {
         this.stdout = streams.Transform({transform: function(chunk, encoding, next) {
           this.push(chunk);

@@ -12,7 +12,7 @@ npm i @mh-cbon/yasudo --save
 
 ```js
 // same as sudo sh -c 'ls -al'
-// it will aks for your password
+// it will ask for your password
 var child = require('@mh-cbon/yasudo')('ls', ['-al']);
 child.stdout.pipe(process.stdout);
 child.stderr.pipe(process.stderr);
@@ -38,12 +38,13 @@ require('@mh-cbon/yasudo')('ls', ['-al'], {
   }
 })
 
-// if one defines an ENV variable with its password, then,
+// if one defines an ENV variable with its password,
+// then it is possible to run commands automatically
 var child = require('@mh-cbon/yasudo', {password: process.env['pwd']})('ls', ['-al']);
 child.stdout.pipe(process.stdout);
 child.stderr.pipe(process.stderr);
 
-// last note, it expose a new event : success
+// last note, it exposes a new event : success
 require('@mh-cbon/yasudo')('ls', ['-al'])
 .on('success', function () {
   console.log('good to go !')
