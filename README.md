@@ -58,7 +58,7 @@ for sure,
 - it does not rely on the output content of `sudo` to detect success/failure
 - it does not clutter your output with my token
 - it respects `stdio` settings such as `inherit` and `ignore`
-- it works seamlessly, even for `stdin`, see [this example](blob/master/examples/stdin.js)
+- it works seamlessly, even for `stdin`, see [this example](https://github.com/mh-cbon/yasudo/blob/master/examples/stdin.js)
 
 # Todo
 
