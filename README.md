@@ -65,6 +65,14 @@ for sure,
 
 - support `ipc` `stdio` setting
 
+# Tests
+
+To run the tests you shall use a command like this :
+
+```sh
+pwd=<your sudo password> mocha tests/
+```
+
 # Read more
 
 - http://stackoverflow.com/questions/1507816/with-bash-how-can-i-pipe-standard-error-into-another-process
