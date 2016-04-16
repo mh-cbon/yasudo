@@ -108,7 +108,6 @@ function sudo(bin, args, options) {
         output: mutableStdout,
         terminal: true
       });
-      //rl.pause();
       rl.on('error', erroredStream('rl'))
 
       // forward typed in data (the password) to the sudo process
