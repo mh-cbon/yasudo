@@ -5,8 +5,6 @@ exports = module.exports = sudo;
 var pkg               = require('./package.json')
 var debug             = require('debug')(pkg.name)
 var randomstring      = require("randomstring");
-var streams           = require('stream')
-var through2          = require('through2')
 var spawn             = require('child_process').spawn;
 var inpathSync        = require('inpath').sync;
 var FakeChildProcess  = require('./lib/fake_child.js')
