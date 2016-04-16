@@ -52,6 +52,9 @@ require('@mh-cbon/yasudo')('ls', ['-al'])
 .on('failure', function () {
   console.log('nop the challenge failed too many times')
 })
+.on('challenged', function (succeed) {
+  console.log('Challenge is now complete. succeeded ? %s', succeed)
+})
 ```
 
 # Internals

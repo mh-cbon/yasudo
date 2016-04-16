@@ -52,24 +52,25 @@ function sudo(bin, args, options) {
     detectToken.once('foundToken', function () {
       debug('hasSolvedTheChallenge %j', true)
       hasSolvedTheChallenge = true;
+     child.emit('challenged', hasSolvedTheChallenge)
      child.emit('success')
      child.stdout.unpipe(detectToken);
     })
     child.stdout.pipe(detectToken);
 
-    var hasEnded = false; // if sudo fails, the stream ends, we should then stop to write on stdin.
+    var hasEnded = false; // track failure/ending of sudo
+    var allDone = function () {
+      debug("child.stdin close")
+      hasEnded = true;
+      if(!hasSolvedTheChallenge) {
+        child.emit('challenged', hasSolvedTheChallenge)
+        child.emit('failure')
+      }
+    };
     if (child.stdin) { // this may be unavailable
-      child.stdin.on('close', function () {
-        debug("child.stdin close")
-        hasEnded = true;
-        if(!hasSolvedTheChallenge) child.emit('failure')
-      })
+      child.stdin.on('close', allDone)
     } else {
-      child.on('exit', function () {
-        debug("child close")
-        hasEnded = true;
-        if(!hasSolvedTheChallenge) child.emit('failure')
-      })
+      child.on('exit', allDone)
     }
 
     // Automatic pasword typing
@@ -79,7 +80,8 @@ function sudo(bin, args, options) {
       var activityWatcher = watchForActivity();
       child.stderr.pipe(activityWatcher);
 
-       // write password to sudo stdin
+      // once stderr is inactive (sudo wrote its message),
+      // write the password to sudo stdin
       activityWatcher.on('inactive', function () {
         if(!hasEnded) {
           debug('typing in pwd %j', options.password)
@@ -111,12 +113,13 @@ function sudo(bin, args, options) {
       rl.on('error', erroredStream('rl'))
 
       // forward typed in data (the password) to the sudo process
-      // use a mustableStream to avoid sending more than necessarily
+      // use a mutableStream to avoid sending data more than needed to sudo stdin
       var mutableStdin = mutableStream({muted: false, name: 'mutableStdin'});
       process.stdin.pipe(mutableStdin)
       mutableStdin.pipe(child.stdin)
 
       // watch stderr activity,
+      // when stderr is written, unmute stdout / mute stdin
       // once it stops to write, mute stdout / unmute stdin
       var activityWatcher = watchForActivity();
       activityWatcher.on('error', erroredStream('activityWatcher'))
@@ -144,12 +147,14 @@ function sudo(bin, args, options) {
       child.on('success', release)
       child.on('failure', release)
 
-      // when the users types in, prevent multiple \r to be buffered
+      // when the users types in,
+      // prevent multiple \r to be buffered
       var stdinLimiter = function (d) {
         if (d.toString().match(/\r$/)) mutableStdin.mute();
       };
       process.stdin.on('data', stdinLimiter);
-      // as the stdin is hidden, manually output \n when the user types in \r
+      // as stdin is hidden,
+      // manually output \n when the user types in \r
       var simulateUser = function (d) {
         if (d.toString().match(/\r$/)) process.stdout.write('\n'); // simulate user typing [Enter]
       };
@@ -157,7 +162,7 @@ function sudo(bin, args, options) {
 
     }
 
-    // required to show the prompt when the password is to provide by hand
+    // when the password is to provide by hand, we must show stderr to the end user
     if(!options.password && options.stdio[2]==="pipe") {
       child.stderr && child.stderr.pipe(process.stderr);
     }
