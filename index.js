@@ -93,8 +93,7 @@ function sudo(bin, args, options) {
         child.stdout.removeListener('data', cleanUp);
         child.stderr.unpipe(activityWatcher);
       };
-      child.on('failure', cleanUp);
-      child.on('success', cleanUp);
+      child.on('challenged', cleanUp);
 
     } else if(options.stdio[0]==="pipe"){
 
@@ -142,8 +141,7 @@ function sudo(bin, args, options) {
         process.stdin.unpipe(mutableStdin)
         child.stderr.unpipe(activityWatcher);
       }
-      child.on('success', release)
-      child.on('failure', release)
+      child.on('challenged', release);
 
       // when the users types in,
       // prevent multiple \r to be buffered
