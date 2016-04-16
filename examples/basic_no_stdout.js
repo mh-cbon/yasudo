@@ -1,6 +1,9 @@
 var sudo = require('../index.js')
 
-var c = sudo('sh', ['-c', 'ls -al && echo "strstderr" 1>&2 '], {stdio: 'inherit', sudo: {k: true}})
+var c = sudo('sh', ['-c', 'ls -al && echo "strstderr" 1>&2 '], {stdio:['inherit', 'ignore', 'pipe'], sudo: {k: true}})
+
+c.stdout && c.stdout.pipe(process.stdout)
+c.stderr && c.stderr.pipe(process.stderr)
 
 c.on('success', function () {
   console.log("success event")

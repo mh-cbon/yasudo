@@ -21,7 +21,8 @@
   "dependencies": {
     "debug": "^2.2.0",
     "inpath": "^1.0.2",
-    "randomstring": "^1.1.4"
+    "randomstring": "^1.1.4",
+    "through2": "^2.0.1"
   },
   "devDependencies": {
     "should": "^8.3.1"

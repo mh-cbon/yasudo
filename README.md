@@ -44,10 +44,13 @@ var child = require('@mh-cbon/yasudo', {password: process.env['pwd']})('ls', ['-
 child.stdout.pipe(process.stdout);
 child.stderr.pipe(process.stderr);
 
-// last note, it exposes a new event : success
+// last note, it exposes new events : success / faiure
 require('@mh-cbon/yasudo')('ls', ['-al'])
 .on('success', function () {
   console.log('good to go !')
+})
+.on('failure', function () {
+  console.log('nop the challenge failed too many times')
 })
 ```
 

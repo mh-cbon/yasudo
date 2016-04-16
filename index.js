@@ -2,12 +2,17 @@
 
 exports = module.exports = sudo;
 
-var pkg = require('./package.json')
-var debug = require('debug')(pkg.name)
-var randomstring = require("randomstring");
-var streams = require('stream')
-var spawn = require('child_process').spawn;
-var inpathSync = require('inpath').sync;
+var pkg               = require('./package.json')
+var debug             = require('debug')(pkg.name)
+var randomstring      = require("randomstring");
+var streams           = require('stream')
+var through2          = require('through2')
+var spawn             = require('child_process').spawn;
+var inpathSync        = require('inpath').sync;
+var FakeChildProcess  = require('./lib/fake_child.js')
+var mutableStream     = require('./lib/mutable_stream.js')
+var detectString      = require('./lib/detect_string.js')
+var watchForActivity  = require('./lib/watch_for_activity.js')
 
 var path = process.env['PATH'].split(':');
 var sudoBin = inpathSync('sudo', path);
@@ -17,163 +22,140 @@ function sudo(bin, args, options) {
     var hasSolvedTheChallenge = false;
 
     var options = options || {};
+    debug('options %j', options);
     var origStdio = JSON.parse(JSON.stringify(options.stdio || false))
-    // normalize the stdio options to something we can actually manage
-    // - preferably use inherit for stdin / stderr (
-    //    because sudo use those two, so if possible let the system manages it
-    // - stdout is always pipe, to be able to catch the token on it
-    if(options.stdio) {
-      if (options.stdio==='inherit') options.stdio = ['inherit', 'pipe', 'inherit']
-      else if (options.stdio==='ignore') options.stdio = ['inherit', 'pipe', 'inherit'] // we cant really ignore.
-      else if (options.stdio==='pipe') options.stdio = ['pipe', 'pipe', 'pipe']
-      if (options.stdio[1]!=="pipe") throw 'fd1 (stdout) must be "pipe"'
-    }
+    debug('origStdio %j', origStdio);
+    options.stdio = normalizeStdio(options.stdio);
 
-    if(!options.stdio) options.stdio = ['inherit', 'pipe', 'inherit']
     if(options.password && options.stdio[0]!=="pipe") options.stdio[0] = 'pipe'
     if(options.password && options.stdio[2]!=="pipe") options.stdio[2] = 'pipe'
+    debug('options %j', options);
 
-    debug('origStdio %j', origStdio)
-    debug('options %j', options)
-
-    // linearize the command bin to -> sudo sh -c 'your command'
-    var command = '' + bin + ' ';
-    args.forEach(function (arg){
-      command += arg.match(/\s/) ? '"' + arg + '"' : arg;
-      command += ' ';
-    })
-
-    // inject the token into your command to detect successful sudo,
-    // such : sudo sh -c 'echo THETOKEN && your command'
-    var args = [ '-S', 'sh', '-c', 'echo "' + token + '" && ' + command ];
-    // some various sudo options, see man sudo
-    if(options.sudo) {
-      if (options.sudo.k) args.unshift('-k')
-      if (options.sudo.E) args.unshift('-E')
-      if (options.sudo.i) args.unshift('-i')
-      if (options.sudo.K) args.unshift('-K')
-      if (options.sudo.P) args.unshift('-P')
-      if (options.sudo.C) {
-        args.unshift('-C')
-        args.unshift(options.sudo.C)
-      }
-      if (options.sudo.g) {
-        args.unshift('-g')
-        args.unshift(options.sudo.g)
-      }
-      if (options.sudo.u) {
-        args.unshift('-u')
-        args.unshift(options.sudo.u)
-      }
-      if (options.sudo.r) {
-        args.unshift('-r')
-        args.unshift(options.sudo.r)
-      }
-      if (options.sudo.t) {
-        args.unshift('-t')
-        args.unshift(options.sudo.t)
-      }
-    }
+    var args = buildCmdAsSudoArgs(bin, args, token, options.sudo);
     debug('args %j', args)
     var child = spawn(sudoBin, args, options);
 
-    var fake = new FakeChildProcess(child, options);
+    process.stdout.on('error', erroredStream('process.stdout'))
+    process.stdin.on('error', erroredStream('process.stdin'))
+    process.stderr.on('error', erroredStream('process.stderr'))
+
+    child.stdout && child.stdout.on('error', erroredStream('child.stdout'))
+    child.stdin && child.stdin.on('error', erroredStream('child.stdin'))
+    child.stderr && child.stderr.on('error', erroredStream('child.stderr'))
+
+    var fake = new FakeChildProcess(child, origStdio);
+    fake.stdin && fake.stdin.pause();
 
     // Listener to catch the token on stdout, tells us that sudo was successful
-    child.stdout.on('data', function challengeSuccess(d) {
-      if(d.toString().match(token)) {
-        debug('hasSolvedTheChallenge %j', true)
-        hasSolvedTheChallenge = true;
-        child.stdout.removeListener('data', challengeSuccess)
-         // Connect the pipe so the fake child can get data
-        child.stdout && fake.stdout && child.stdout.pipe(fake.stdout);
-        child.stderr && fake.stderr && child.stderr.pipe(fake.stderr);
-        child.stdin && fake.stdin && fake.stdin.pipe(child.stdin);
-        child.emit('success')
-      }
+    var detectToken = detectString({once:true, token: token})
+    detectToken.on('error', erroredStream('detectToken'))
+    detectToken.once('foundToken', function () {
+      debug('hasSolvedTheChallenge %j', true)
+      hasSolvedTheChallenge = true;
+     child.emit('success')
+     child.stdout.unpipe(detectToken);
     })
+    child.stdout.pipe(detectToken);
+
+    var hasEnded = false; // if sudo fails, the stream ends, we should then stop to write on stdin.
+    if (child.stdin) { // this may be unavailable
+      child.stdin.on('close', function () {
+        debug("child.stdin close")
+        hasEnded = true;
+        if(!hasSolvedTheChallenge) child.emit('failure')
+      })
+    } else {
+      child.on('exit', function () {
+        debug("child close")
+        hasEnded = true;
+        if(!hasSolvedTheChallenge) child.emit('failure')
+      })
+    }
 
     // Automatic pasword typing
     if(options.password) {
-      var waitToInputPwd; // Wait that stderr does not have activity anymore.
-      var hasEnded = false; // if sudo fails, the stream ends, we should then stop to write on stdin.
-      var askForChallenge = function (d) {
-        clearTimeout(waitToInputPwd);
-        waitToInputPwd = setTimeout(function () {
+
+      // watch stderr activity, once it stops to write, input the password
+      var activityWatcher = watchForActivity();
+      child.stderr.pipe(activityWatcher);
+
+       // write password to sudo stdin
+      activityWatcher.on('inactive', function () {
+        if(!hasEnded) {
           debug('typing in pwd %j', options.password)
-          if(!hasEnded) {
-            child.stdin.write(options.password + '\n');
-            process.stderr.write('\n'); // simulate user typing [Enter]
-          } else {
-            debug('cannot write password, stdin has ended')
-          }
-        }, 100)
-      };
-      var cleanUp = function (d) {
-        if(hasSolvedTheChallenge) {
-          child.stderr.removeListener('data', askForChallenge);
-          child.stdout.removeListener('data', cleanUp);
+          child.stdin.write(options.password + '\r');
+        } else {
+          debug('cannot write password, stdin has ended')
         }
-      };
-      child.stderr.on('data', askForChallenge);
-      child.stdout.on('data', cleanUp);
-      child.stdin.on('end', function () {
-        hasEnded = true;
       })
+
+      var cleanUp = function () {
+        child.stdout.removeListener('data', cleanUp);
+        child.stderr.unpipe(activityWatcher);
+      };
+      child.on('failure', cleanUp);
+      child.on('success', cleanUp);
 
     } else if(options.stdio[0]==="pipe"){
 
-      var hasEnded = false; // if it fails, the stream ends, we should then stop to write on stdin.
       // Mutable stream to hide the password while the user types it
-      var waitToResumeInput;
-      var Writable = require('stream').Writable;
-      var mutableStdout = new Writable({
-        write: function(chunk, encoding, callback) {
-          if (!this.muted) process.stdout.write(chunk, encoding);
-          callback();
-        }
-      });
-
-      mutableStdout.muted = false;
+      var mutableStdout = mutableStream({muted: false, name: 'mutableStdout'});
+      mutableStdout.pipe(process.stdout);
+      mutableStdout.on('error', erroredStream('mutableStdout'))
 
       var rl = require('readline').createInterface({
         input: process.stdin,
         output: mutableStdout,
         terminal: true
       });
-      rl.pause();
-      var muter = function (d) {
-        mutableStdout.muted = false;
-        if(!hasSolvedTheChallenge) {
-          clearTimeout(waitToResumeInput);
-          waitToResumeInput = setTimeout(function () {
-            mutableStdout.muted = true;
-            rl.resume();
-          }, 100)
-        }
-      }
-      child.stderr.on('data', muter)
+      //rl.pause();
+      rl.on('error', erroredStream('rl'))
 
       // forward typed in data (the password) to the sudo process
-      var writeProcessStdin = function (d) {
-        if(!hasEnded){
-          d = d.toString();
-          child.stdin.write(d);
-          if (d.match(/\r$/)) process.stdout.write('\n'); // simulate user typing [Enter]
-          debug('forwarding stdin %j', d)
-        } else {
-          debug('cannot forward data, stdin has ended')
-        }
+      // use a mustableStream to avoid sending more than necessarily
+      var mutableStdin = mutableStream({muted: false, name: 'mutableStdin'});
+      process.stdin.pipe(mutableStdin)
+      mutableStdin.pipe(child.stdin)
+
+      // watch stderr activity,
+      // once it stops to write, mute stdout / unmute stdin
+      var activityWatcher = watchForActivity();
+      activityWatcher.on('error', erroredStream('activityWatcher'))
+      child.stderr.pipe(activityWatcher);
+
+      activityWatcher.on('active', function () {
+        mutableStdout.unmute();
+        mutableStdin.mute();
+        rl.pause();
+      })
+
+      activityWatcher.on('inactive', function () {
+        mutableStdout.mute();
+        mutableStdin.unmute();
+        rl.resume();
+      })
+
+      var release = function() {
+        debug('release');
+        rl.close();
+        mutableStdout.unpipe(process.stdout);
+        process.stdin.unpipe(mutableStdin)
+        child.stderr.unpipe(activityWatcher);
+      }
+      child.on('success', release)
+      child.on('failure', release)
+
+      // when the users types in, prevent multiple \r to be buffered
+      var stdinLimiter = function (d) {
+        if (d.toString().match(/\r$/)) mutableStdin.mute();
       };
-      process.stdin.on('data', writeProcessStdin);
-      child.on('close', function () {
-        child.stderr && child.stderr.unpipe(process.stderr);
-        process.stdin.removeListener('data', writeProcessStdin);
-        process.stdin.pause();
-      })
-      child.stdin.on('end', function () {
-        hasEnded = true;
-      })
+      process.stdin.on('data', stdinLimiter);
+      // as the stdin is hidden, manually output \n when the user types in \r
+      var simulateUser = function (d) {
+        if (d.toString().match(/\r$/)) process.stdout.write('\n'); // simulate user typing [Enter]
+      };
+      mutableStdin.on('data', simulateUser);
+
     }
 
     // required to show the prompt when the password is to provide by hand
@@ -181,65 +163,98 @@ function sudo(bin, args, options) {
       child.stderr && child.stderr.pipe(process.stderr);
     }
 
-    // simulate inherit option
-    if(origStdio==='inherit'){
-      child.once('success', function () {
+    // re connect all the pipes accordingly
+    child.once('success', function () {
+      debug('success origStdio=%s', origStdio);
+      child.stdout && child.stdout.unpipe(process.stdout);
+      child.stderr && child.stderr.unpipe(process.stderr);
+
+      if(!origStdio || origStdio==='pipe' || origStdio[0]==='pipe')
+        child.stdin && fake.stdin && fake.stdin.pipe(child.stdin);
+      if(!origStdio || origStdio==='pipe' || origStdio[1]==='pipe')
+        child.stdout && fake.stdout && child.stdout.pipe(fake.stdout);
+      if(!origStdio || origStdio==='pipe' || origStdio[2]==='pipe')
+        child.stderr && fake.stderr && child.stderr.pipe(fake.stderr);
+
+      if(origStdio==='inherit' || origStdio[1]==='inherit')
         child.stdout && child.stdout.pipe(process.stdout);
-      })
-    }
+      if(origStdio==='inherit' || origStdio[2]==='inherit')
+        child.stderr && child.stderr.pipe(process.stderr);
 
-    // a fake child with customs stdio streams
-    function FakeChildProcess(c, options){
-      if(origStdio===false || (origStdio && (origStdio==='pipe' || options==='pipe'))) {
-        this.stdout = streams.Transform({transform: function(chunk, encoding, next) {
-          this.push(chunk);
-          next(null);
-        },
-        flush: function(done) {
-          done();
-        }})
-      }
-      if(origStdio===false || (origStdio && (origStdio==='pipe' || options==='pipe'))) {
-        this.stderr = streams.Transform({transform: function(chunk, encoding, next) {
-          this.push(chunk);
-          next(null);
-        },
-        flush: function(done) {
-          done();
-        }})
-      }
-      if(origStdio===false || (origStdio && (origStdio==='pipe' || options==='pipe'))) {
-        this.stdin = streams.Transform({transform: function(chunk, encoding, next) {
-          this.push(chunk);
-          next(null);
-        },
-        flush: function(done) {
-          done();
-        }})
-      }
-
-      debug("origStdio %j", origStdio);
-
-      this.pid = c.pid;
-      this.kill = c.kill.bind(c);
-      this.on = c.on.bind(c);
-      this.once = c.once.bind(c);
-      this.removeAllListeners = c.removeAllListeners.bind(c);
-      this.removeListener = c.removeListener.bind(c);
-      this.addListener = c.addListener.bind(c);
-      this.emit = c.emit.bind(c);
-      this.getMaxListeners = c.getMaxListeners.bind(c);
-      this.setMaxListeners = c.setMaxListeners.bind(c);
-      this.listenerCount = c.listenerCount.bind(c);
-      this.listeners = c.listeners.bind(c);
-      var that = this;
-      c.once('close', function (code) {
-        debug('fake close %j', code)
-        that.stdout && that.stdout.end()
-        that.stderr && that.stderr.end()
-        that.stdin && that.stdin.end()
-      })
-    }
+      fake.stdin && fake.stdin.resume();
+    })
 
     return fake;
+}
+
+function buildCmdAsSudoArgs (bin, args, token, sudoOptions) {
+  var sudoArgs = []
+  // linearize the command bin to -> sudo sh -c 'your command'
+  var command = '' + bin + ' ';
+  args.forEach(function (arg){
+    command += arg.match(/\s/) ? '"' + arg + '"' : arg;
+    command += ' ';
+  })
+
+  // inject the token into your command to detect successful sudo,
+  // such : sudo sh -c 'echo THETOKEN && your command'
+  var sudoArgs = [ '-S', 'sh', '-c', 'echo "' + token + '" && ' + command ];
+  // some various sudo options, see man sudo
+  if(sudoOptions) {
+    if (sudoOptions.k) sudoArgs.unshift('-k')
+    if (sudoOptions.E) sudoArgs.unshift('-E')
+    if (sudoOptions.i) sudoArgs.unshift('-i')
+    if (sudoOptions.K) sudoArgs.unshift('-K')
+    if (sudoOptions.P) sudoArgs.unshift('-P')
+    if (sudoOptions.C) {
+      sudoArgs.unshift('-C')
+      sudoArgs.unshift(sudoOptions.C)
+    }
+    if (sudoOptions.g) {
+      sudoArgs.unshift('-g')
+      sudoArgs.unshift(sudoOptions.g)
+    }
+    if (sudoOptions.u) {
+      sudoArgs.unshift('-u')
+      sudoArgs.unshift(sudoOptions.u)
+    }
+    if (sudoOptions.r) {
+      sudoArgs.unshift('-r')
+      sudoArgs.unshift(sudoOptions.r)
+    }
+    if (sudoOptions.t) {
+      sudoArgs.unshift('-t')
+      sudoArgs.unshift(sudoOptions.t)
+    }
+  }
+  return sudoArgs;
+}
+
+function normalizeStdio (stdio) {
+  var ret = []
+  // normalize the stdio options to something we can actually manage
+  // - preferably use inherit for stdin / stderr (
+  //    because sudo use those two, so if possible let the system manages it
+  // - stdout is always pipe, to be able to catch the token on it
+  if(stdio) {
+    if (stdio==='inherit')      ret = ['inherit', 'pipe', 'inherit']
+    else if (stdio==='ignore')  ret = ['inherit', 'pipe', 'pipe']   // we cant really ignore.
+    else if (stdio==='pipe')    ret = ['pipe', 'pipe', 'pipe']
+    else {
+      if (stdio[2]!=='pipe') stdio[2] = 'pipe'
+      if (stdio[1]!=='pipe') stdio[1] = 'pipe'
+      ret = stdio;
+    }
+  } else {
+    ret = ['inherit', 'pipe', 'inherit']
+  }
+  return ret;
+}
+
+function erroredStream(name) {
+  return function (err) {
+    var target = this===process.stderr ? console.log : console.error;
+    target(err.stack);
+    target("stream '" + name + "' got error %j", err)
+  }
 }

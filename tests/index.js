@@ -22,7 +22,7 @@ describe('basic example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i)
       stdout.should.match(/stdout true/)
       stdout.should.match(/stderr true/)
@@ -48,7 +48,7 @@ describe('basic example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stdout.should.match(/drwxrwxr/);
       stderr.should.match(/has exited 0/i)
@@ -73,7 +73,175 @@ describe('basic example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
+      stderr.should.match(/(mot de passe|password)/i);
+      stderr.should.match(/(incorrect)/i);
+      stderr.should.match(/has exited 1/i)
+      stdout.should.match(/stdout true/);
+      stdout.should.not.match(/strstderr/);
+      stderr.should.not.match(/strstderr/);
+      stderr.should.not.match(/drwxrwxr-x/);
+      stdout.should.not.match(/success event/)
+      stdout.should.not.match(/THETOKENPREDEFINED/)
+      stderr.should.not.match(/THETOKENPREDEFINED/)
+      done();
+    })
+    c.stdout.pipe(process.stdout);
+    c.stderr.pipe(process.stderr);
+    c.stdin.write('nop\r')
+    c.stdin.write('nop\r')
+    c.stdin.end('nop\r')
+  });
+})
+
+describe('basic_no_stdout example', function () {
+  it('should ask the password', function (done) {
+    var c = spawn('node', [path.join(__dirname, '../examples/basic_no_stdout.js')], {stdio: 'pipe'})
+    var stderr = '';
+    var stdout = '';
+    c.stderr.on('data', function (d) {
+      stderr += d.toString()
+    })
+    c.stdout.on('data', function (d) {
+      stdout += d.toString()
+    })
+    c.on('exit', function (){
+      stderr.should.match(/(mot de passe|password)/i)
+      stdout.should.match(/stdout false/)
+      stdout.should.match(/stderr true/)
+      stdout.should.match(/stdin false/)
+      stdout.should.not.match(/success event/)
+      stdout.should.not.match(/THETOKENPREDEFINED/)
+      stderr.should.not.match(/THETOKENPREDEFINED/)
+      done();
+    })
+    c.stdout.pipe(process.stdout);
+    c.stderr.pipe(process.stderr);
+    setTimeout(function () {
+      c.kill();
+    }, 500)
+  });
+  it('should not display the command stdout', function (done) {
+    var c = spawn('node', [path.join(__dirname, '../examples/basic_no_stdout.js')], {stdio: 'pipe'})
+    var stderr = '';
+    var stdout = '';
+    c.stderr.on('data', function (d) {
+      stderr += d.toString()
+    })
+    c.stdout.on('data', function (d) {
+      stdout += d.toString()
+    })
+    c.on('exit', function (){
+      stderr.should.match(/(mot de passe|password)/i);
+      stdout.should.not.match(/drwxrwxr/);
+      stdout.should.not.match(/strstderr/);
+      stderr.should.match(/has exited 0/i)
+      stderr.should.match(/strstderr/i)
+      stderr.should.not.match(/drwxrwxr-x/);
+      stdout.should.match(/success event/)
+      stdout.should.not.match(/THETOKENPREDEFINED/)
+      stderr.should.not.match(/THETOKENPREDEFINED/)
+      done();
+    })
+    c.stdout.pipe(process.stdout);
+    c.stderr.pipe(process.stderr);
+    c.stdin.end(process.env['pwd'] + '\n')
+  });
+  it('should fail properly', function (done) {
+    this.timeout(10000);
+    var c = spawn('node', [path.join(__dirname, '../examples/basic_no_stdout.js')], {stdio: 'pipe'})
+    var stderr = '';
+    var stdout = '';
+    c.stderr.on('data', function (d) {
+      stderr += d.toString()
+    })
+    c.stdout.on('data', function (d) {
+      stdout += d.toString()
+    })
+    c.on('exit', function (){
+      stderr.should.match(/(mot de passe|password)/i);
+      stderr.should.match(/(incorrect)/i);
+      stderr.should.match(/has exited 1/i)
+      stdout.should.match(/stdout false/);
+      stderr.should.not.match(/drwxrwxr-x/);
+      stdout.should.not.match(/success event/)
+      stdout.should.not.match(/THETOKENPREDEFINED/)
+      stderr.should.not.match(/THETOKENPREDEFINED/)
+      done();
+    })
+    c.stdout.pipe(process.stdout);
+    c.stderr.pipe(process.stderr);
+    c.stdin.write('nop\r')
+    c.stdin.write('nop\r')
+    c.stdin.end('nop\r')
+  });
+})
+
+describe('basic_no_stderr example', function () {
+  it('should ask the password', function (done) {
+    var c = spawn('node', [path.join(__dirname, '../examples/basic_no_stderr.js')], {stdio: 'pipe'})
+    var stderr = '';
+    var stdout = '';
+    c.stderr.on('data', function (d) {
+      stderr += d.toString()
+    })
+    c.stdout.on('data', function (d) {
+      stdout += d.toString()
+    })
+    c.on('exit', function (){
+      stderr.should.match(/(mot de passe|password)/i)
+      stdout.should.match(/stdout true/)
+      stdout.should.match(/stderr false/)
+      stdout.should.match(/stdin false/)
+      stdout.should.not.match(/success event/)
+      stdout.should.not.match(/THETOKENPREDEFINED/)
+      stderr.should.not.match(/THETOKENPREDEFINED/)
+      done();
+    })
+    c.stdout.pipe(process.stdout);
+    c.stderr.pipe(process.stderr);
+    setTimeout(function () {
+      c.kill();
+    }, 500)
+  });
+  it('should not display the command stderr', function (done) {
+    var c = spawn('node', [path.join(__dirname, '../examples/basic_no_stderr.js')], {stdio: 'pipe'})
+    var stderr = '';
+    var stdout = '';
+    c.stderr.on('data', function (d) {
+      stderr += d.toString()
+    })
+    c.stdout.on('data', function (d) {
+      stdout += d.toString()
+    })
+    c.on('exit', function (){
+      stderr.should.match(/(mot de passe|password)/i);
+      stdout.should.match(/drwxrwxr/);
+      stdout.should.not.match(/strstderr/);
+      stderr.should.match(/has exited 0/i)
+      stderr.should.not.match(/strstderr/i)
+      stderr.should.not.match(/drwxrwxr-x/);
+      stdout.should.match(/success event/)
+      stdout.should.not.match(/THETOKENPREDEFINED/)
+      stderr.should.not.match(/THETOKENPREDEFINED/)
+      done();
+    })
+    c.stdout.pipe(process.stdout);
+    c.stderr.pipe(process.stderr);
+    c.stdin.end(process.env['pwd'] + '\n')
+  });
+  it('should fail properly', function (done) {
+    this.timeout(10000);
+    var c = spawn('node', [path.join(__dirname, '../examples/basic_no_stderr.js')], {stdio: 'pipe'})
+    var stderr = '';
+    var stdout = '';
+    c.stderr.on('data', function (d) {
+      stderr += d.toString()
+    })
+    c.stdout.on('data', function (d) {
+      stdout += d.toString()
+    })
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stderr.should.match(/(incorrect)/i);
       stderr.should.match(/has exited 1/i)
@@ -104,7 +272,7 @@ describe('ignored pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i)
       stdout.should.match(/stdout false/)
       stdout.should.match(/stderr false/)
@@ -130,7 +298,7 @@ describe('ignored pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stdout.should.not.match(/drwxrwxr/);
       stderr.should.match(/has exited 0/i)
@@ -155,7 +323,7 @@ describe('ignored pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stderr.should.match(/(incorrect)/i);
       stderr.should.match(/has exited 1/i)
@@ -185,7 +353,7 @@ describe('inherited pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i)
       stdout.should.match(/stdout false/)
       stdout.should.match(/stderr false/)
@@ -211,7 +379,7 @@ describe('inherited pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stdout.should.match(/drwxrwxr/);
       stderr.should.match(/has exited 0/i)
@@ -236,7 +404,7 @@ describe('inherited pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stderr.should.match(/(incorrect)/i);
       stderr.should.match(/has exited 1/i)
@@ -267,7 +435,7 @@ describe('stdin pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i)
       stdout.should.match(/stdout true/)
       stdout.should.match(/stderr true/)
@@ -286,6 +454,7 @@ describe('stdin pipe example', function () {
     }, 500)
   });
   it('should display the command output', function (done) {
+    this.timeout(5000)
     var c = spawn('node', [path.join(__dirname, '../examples/stdin.js')], {stdio: 'pipe'})
     var stderr = '';
     var stdout = '';
@@ -295,12 +464,12 @@ describe('stdin pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stdout.should.match(/stdout true/)
       stdout.should.match(/stderr true/)
       stdout.should.match(/stdin true/)
-      stdout.should.match(/got data "something"\n/)
+      stdout.should.match(/stdout data "something"\n/)
       stderr.should.match(/has exited 0/i)
       stdout.should.match(/success event/)
       stdout.should.not.match(/THETOKENPREDEFINED/)
@@ -324,7 +493,7 @@ describe('stdin pipe example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.match(/(mot de passe|password)/i);
       stderr.should.match(/(incorrect)/i);
       stderr.should.match(/has exited 1/i)
@@ -343,7 +512,7 @@ describe('stdin pipe example', function () {
     c.stderr.pipe(process.stderr);
     c.stdin.write('nop\r')
     c.stdin.write('nop\r')
-    c.stdin.end('nop\r')
+    c.stdin.write('nop\r')
   });
 })
 
@@ -361,7 +530,7 @@ describe('password option example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.not.match(/(mot de passe|password)/i)
       stderr.should.match(/has exited 0/i)
       stdout.should.match(/stdout true/)
@@ -389,7 +558,7 @@ describe('password option example', function () {
     c.stdout.on('data', function (d) {
       stdout += d.toString()
     })
-    c.on('close', function (){
+    c.on('exit', function (){
       stderr.should.not.match(/(mot de passe|password)/i)
       stderr.should.match(/has exited 1/i)
       stdout.should.match(/stdout true/)
