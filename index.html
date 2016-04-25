@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Yasudo by mh-cbon</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Yasudo</h1>
+      <h2 class="project-tagline">yet another sudo command helper</h2>
+      <a href="https://github.com/mh-cbon/yasudo" class="btn">View on GitHub</a>
+      <a href="https://github.com/mh-cbon/yasudo/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/mh-cbon/yasudo/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1>
+<a id="yasudo---yet-another-sudo-helper-for-node" class="anchor" href="#yasudo---yet-another-sudo-helper-for-node" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>yasudo - yet another sudo helper for node</h1>
+
+<p>An helper to run an <code>sudo</code> command with node.</p>
+
+<h1>
+<a id="install" class="anchor" href="#install" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Install</h1>
+
+<div class="highlight highlight-source-shell"><pre>npm i @mh-cbon/yasudo --save</pre></div>
+
+<h1>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Usage</h1>
+
+<div class="highlight highlight-source-js"><pre><span class="pl-c">// same as sudo sh -c 'ls -al'</span>
+<span class="pl-c">// it will ask for your password</span>
+<span class="pl-k">var</span> child <span class="pl-k">=</span> <span class="pl-c1">require</span>(<span class="pl-s"><span class="pl-pds">'</span>@mh-cbon/yasudo<span class="pl-pds">'</span></span>)(<span class="pl-s"><span class="pl-pds">'</span>ls<span class="pl-pds">'</span></span>, [<span class="pl-s"><span class="pl-pds">'</span>-al<span class="pl-pds">'</span></span>]);
+<span class="pl-smi">child</span>.<span class="pl-smi">stdout</span>.<span class="pl-en">pipe</span>(<span class="pl-c1">process</span>.<span class="pl-smi">stdout</span>);
+<span class="pl-smi">child</span>.<span class="pl-smi">stderr</span>.<span class="pl-en">pipe</span>(<span class="pl-c1">process</span>.<span class="pl-smi">stderr</span>);
+
+<span class="pl-c">// in depth options</span>
+<span class="pl-c1">require</span>(<span class="pl-s"><span class="pl-pds">'</span>@mh-cbon/yasudo<span class="pl-pds">'</span></span>)(<span class="pl-s"><span class="pl-pds">'</span>ls<span class="pl-pds">'</span></span>, [<span class="pl-s"><span class="pl-pds">'</span>-al<span class="pl-pds">'</span></span>], {
+  password<span class="pl-k">:</span> <span class="pl-s"><span class="pl-pds">'</span>your sudo password, to automatically answer the challenge<span class="pl-pds">'</span></span>,
+  sudo<span class="pl-k">:</span> {
+    <span class="pl-c">// to configure behavior of sudo, see man sudo</span>
+    k<span class="pl-k">:</span> <span class="pl-c1">true</span>,  <span class="pl-c">// When used without a command, invalidates the user's cached credentials.</span>
+    E<span class="pl-k">:</span> <span class="pl-c1">true</span>,  <span class="pl-c">// Indicates to the security policy that the user wishes to preserve their existing envi‐</span>
+              <span class="pl-c">// -ronment variables.</span>
+    i<span class="pl-k">:</span> <span class="pl-c1">true</span>,  <span class="pl-c">// Run the shell specified by the target user's password database entry as a login shell.</span>
+              <span class="pl-c">// This means that login-specific resource files such as .profile or .login</span>
+    K<span class="pl-k">:</span> <span class="pl-c1">true</span>,  <span class="pl-c">// Similar to the -k option, except that it removes the user's cached credentials entirely</span>
+              <span class="pl-c">// and may not be used in conjunction with a command or other option.</span>
+    P<span class="pl-k">:</span> <span class="pl-c1">true</span>,  <span class="pl-c">// Preserve the invoking user's group vector unaltered.</span>
+    C<span class="pl-k">:</span> <span class="pl-c1">4</span>,     <span class="pl-c">// Close all file descriptors greater than or equal to num before executing a command.</span>
+    g<span class="pl-k">:</span> <span class="pl-s"><span class="pl-pds">"</span>the group<span class="pl-pds">"</span></span>, <span class="pl-c">// Run the command with the primary group set to group</span>
+    u<span class="pl-k">:</span> <span class="pl-s"><span class="pl-pds">"</span>the user<span class="pl-pds">"</span></span>, <span class="pl-c">// Run the command as a user other than the default target user (usually root).</span>
+    r<span class="pl-k">:</span> <span class="pl-s"><span class="pl-pds">"</span>the role<span class="pl-pds">"</span></span>, <span class="pl-c">// Run the command with an SELinux security context that includes the specified role.</span>
+    t<span class="pl-k">:</span> <span class="pl-s"><span class="pl-pds">"</span>the type<span class="pl-pds">"</span></span>, <span class="pl-c">// Run the command with an SELinux security context that includes the specified type.</span>
+  }
+})
+
+<span class="pl-c">// if one defines an ENV variable with its password,</span>
+<span class="pl-c">// then it is possible to run commands automatically</span>
+<span class="pl-k">var</span> child <span class="pl-k">=</span> <span class="pl-c1">require</span>(<span class="pl-s"><span class="pl-pds">'</span>@mh-cbon/yasudo<span class="pl-pds">'</span></span>, {password<span class="pl-k">:</span> <span class="pl-c1">process</span>.<span class="pl-smi">env</span>[<span class="pl-s"><span class="pl-pds">'</span>pwd<span class="pl-pds">'</span></span>]})(<span class="pl-s"><span class="pl-pds">'</span>ls<span class="pl-pds">'</span></span>, [<span class="pl-s"><span class="pl-pds">'</span>-al<span class="pl-pds">'</span></span>]);
+<span class="pl-smi">child</span>.<span class="pl-smi">stdout</span>.<span class="pl-en">pipe</span>(<span class="pl-c1">process</span>.<span class="pl-smi">stdout</span>);
+<span class="pl-smi">child</span>.<span class="pl-smi">stderr</span>.<span class="pl-en">pipe</span>(<span class="pl-c1">process</span>.<span class="pl-smi">stderr</span>);
+
+<span class="pl-c">// last note, it exposes new events : success / faiure</span>
+<span class="pl-c1">require</span>(<span class="pl-s"><span class="pl-pds">'</span>@mh-cbon/yasudo<span class="pl-pds">'</span></span>)(<span class="pl-s"><span class="pl-pds">'</span>ls<span class="pl-pds">'</span></span>, [<span class="pl-s"><span class="pl-pds">'</span>-al<span class="pl-pds">'</span></span>])
+.<span class="pl-en">on</span>(<span class="pl-s"><span class="pl-pds">'</span>success<span class="pl-pds">'</span></span>, <span class="pl-k">function</span> () {
+  <span class="pl-en">console</span>.<span class="pl-c1">log</span>(<span class="pl-s"><span class="pl-pds">'</span>good to go !<span class="pl-pds">'</span></span>)
+})
+.<span class="pl-en">on</span>(<span class="pl-s"><span class="pl-pds">'</span>failure<span class="pl-pds">'</span></span>, <span class="pl-k">function</span> () {
+  <span class="pl-en">console</span>.<span class="pl-c1">log</span>(<span class="pl-s"><span class="pl-pds">'</span>nop the challenge failed too many times<span class="pl-pds">'</span></span>)
+})
+.<span class="pl-en">on</span>(<span class="pl-s"><span class="pl-pds">'</span>challenged<span class="pl-pds">'</span></span>, <span class="pl-k">function</span> (<span class="pl-smi">succeed</span>) {
+  <span class="pl-en">console</span>.<span class="pl-c1">log</span>(<span class="pl-s"><span class="pl-pds">'</span>Challenge is now complete. succeeded ? %s<span class="pl-pds">'</span></span>, succeed)
+})</pre></div>
+
+<h1>
+<a id="internals" class="anchor" href="#internals" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Internals</h1>
+
+<p>It works by echoing a <code>token</code> on <code>stdout</code> and later detects it to determine that <code>sudo</code> succeeded.</p>
+
+<p>for sure,</p>
+
+<ul>
+<li>it does not rely on the output content of <code>sudo</code> to detect success/failure</li>
+<li>it does not clutter your output with my token</li>
+<li>it respects <code>stdio</code> settings such as <code>inherit</code> and <code>ignore</code>
+</li>
+<li>it works seamlessly, even for <code>stdin</code>, see <a href="https://github.com/mh-cbon/yasudo/blob/master/examples/stdin.js">this example</a>
+</li>
+</ul>
+
+<h1>
+<a id="todo" class="anchor" href="#todo" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Todo</h1>
+
+<ul>
+<li>support <code>ipc</code> <code>stdio</code> setting</li>
+</ul>
+
+<h1>
+<a id="tests" class="anchor" href="#tests" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Tests</h1>
+
+<p>To run the tests you shall use a command like this :</p>
+
+<div class="highlight highlight-source-shell"><pre><span class="pl-c1">pwd</span>=<span class="pl-k">&lt;</span>your sudo password<span class="pl-k">&gt;</span> mocha tests/</pre></div>
+
+<h1>
+<a id="read-more" class="anchor" href="#read-more" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Read more</h1>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/1507816/with-bash-how-can-i-pipe-standard-error-into-another-process">http://stackoverflow.com/questions/1507816/with-bash-how-can-i-pipe-standard-error-into-another-process</a></li>
+<li><a href="https://github.com/calmh/node-sudo">https://github.com/calmh/node-sudo</a></li>
+</ul>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/mh-cbon/yasudo">Yasudo</a> is maintained by <a href="https://github.com/mh-cbon">mh-cbon</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
