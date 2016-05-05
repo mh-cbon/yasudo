@@ -33,10 +33,6 @@ function sudo(bin, args, options) {
     debug('args %j', args)
     var child = spawn(sudoBin, args, options);
 
-    process.stdout.on('error', erroredStream('process.stdout'))
-    process.stdin.on('error', erroredStream('process.stdin'))
-    process.stderr.on('error', erroredStream('process.stderr'))
-
     child.stdout && child.stdout.on('error', erroredStream('child.stdout'))
     child.stdin && child.stdin.on('error', erroredStream('child.stdin'))
     child.stderr && child.stderr.on('error', erroredStream('child.stderr'))
