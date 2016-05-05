@@ -1,6 +1,6 @@
 {
   "name": "@mh-cbon/yasudo",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "yet another sudo command helper",
   "main": "index.js",
   "scripts": {
