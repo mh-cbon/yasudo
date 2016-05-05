@@ -25,8 +25,8 @@ function sudo(bin, args, options) {
     debug('origStdio %j', origStdio);
     options.stdio = normalizeStdio(options.stdio);
 
-    if(options.password && options.stdio[0]!=="pipe") options.stdio[0] = 'pipe'
-    if(options.password && options.stdio[2]!=="pipe") options.stdio[2] = 'pipe'
+    if('password' in options && options.stdio[0]!=="pipe") options.stdio[0] = 'pipe'
+    if('password' in options && options.stdio[2]!=="pipe") options.stdio[2] = 'pipe'
     debug('options %j', options);
 
     var args = buildCmdAsSudoArgs(bin, args, token, options.sudo);
@@ -72,7 +72,7 @@ function sudo(bin, args, options) {
     }
 
     // Automatic pasword typing
-    if(options.password) {
+    if('password' in options) {
 
       // watch stderr activity, once it stops to write, input the password
       var activityWatcher = watchForActivity();
@@ -159,7 +159,7 @@ function sudo(bin, args, options) {
     }
 
     // when the password is to provide by hand, we must show stderr to the end user
-    if(!options.password && options.stdio[2]==="pipe") {
+    if(!('password' in options) && options.stdio[2]==="pipe") {
       child.stderr && child.stderr.pipe(process.stderr);
     }
 
