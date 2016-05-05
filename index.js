@@ -46,9 +46,9 @@ function sudo(bin, args, options) {
     detectToken.once('foundToken', function () {
       debug('hasSolvedTheChallenge %j', true)
       hasSolvedTheChallenge = true;
-     child.emit('challenged', hasSolvedTheChallenge)
-     child.emit('success')
-     child.stdout.unpipe(detectToken);
+      child.emit('challenged', hasSolvedTheChallenge)
+      child.emit('success')
+      child.stdout.unpipe(detectToken);
     })
     child.stdout.pipe(detectToken);
 
@@ -78,18 +78,17 @@ function sudo(bin, args, options) {
       // write the password to sudo stdin
       activityWatcher.on('inactive', function () {
         if(!hasEnded) {
-          debug('typing in pwd %j', options.password)
-          child.stdin.write(options.password + '\r');
+          var pwd = options.password.replace(/\r$/, '').replace(/\n$/, '')
+          debug('typing in pwd %j', pwd)
+          child.stdin.write(pwd + '\n');
         } else {
           debug('cannot write password, stdin has ended')
         }
       })
 
-      var cleanUp = function () {
-        child.stdout.removeListener('data', cleanUp);
+      child.once('challenged', function () {
         child.stderr.unpipe(activityWatcher);
-      };
-      child.on('challenged', cleanUp);
+      });
 
     } else if(options.stdio[0]==="pipe"){
 
@@ -107,8 +106,7 @@ function sudo(bin, args, options) {
 
       // forward typed in data (the password) to the sudo process
       // use a mutableStream to avoid sending data more than needed to sudo stdin
-      var mutableStdin = mutableStream({muted: false, name: 'mutableStdin'});
-      process.stdin.pipe(mutableStdin)
+      var mutableStdin = process.stdin.pipe(mutableStream({muted: false, name: 'mutableStdin'}))
       mutableStdin.pipe(child.stdin)
 
       // watch stderr activity,
@@ -116,41 +114,39 @@ function sudo(bin, args, options) {
       // once it stops to write, mute stdout / unmute stdin
       var activityWatcher = watchForActivity();
       activityWatcher.on('error', erroredStream('activityWatcher'))
-      child.stderr.pipe(activityWatcher);
-
-      activityWatcher.on('active', function () {
+      child.stderr
+      .pipe(watchForActivity())
+      .on('error', erroredStream('activityWatcher'))
+      .on('active', function () {
         mutableStdout.unmute();
         mutableStdin.mute();
         rl.pause();
       })
-
-      activityWatcher.on('inactive', function () {
+      .on('inactive', function () {
         mutableStdout.mute();
         mutableStdin.unmute();
         rl.resume();
       })
 
-      var release = function() {
+      child.once('challenged', function() {
         debug('release');
         rl.close();
         mutableStdout.unpipe(process.stdout);
         process.stdin.unpipe(mutableStdin)
         child.stderr.unpipe(activityWatcher);
-      }
-      child.on('challenged', release);
+      });
 
       // when the users types in,
       // prevent multiple \r to be buffered
-      var stdinLimiter = function (d) {
-        if (d.toString().match(/\r$/)) mutableStdin.mute();
-      };
-      process.stdin.on('data', stdinLimiter);
+      process.stdin.on('data', function (d) {
+        if (d.toString().match(/(\n|\r)$/)) mutableStdin.mute();
+      });
       // as stdin is hidden,
       // manually output \n when the user types in \r
-      var simulateUser = function (d) {
-        if (d.toString().match(/\r$/)) process.stdout.write('\n'); // simulate user typing [Enter]
-      };
-      mutableStdin.on('data', simulateUser);
+      mutableStdin.on('data', function (d) {
+        if (d.toString().match(/(\n|\r)$/))
+          process.stdout.write('\n');
+      });
 
     }
 
@@ -194,7 +190,7 @@ function buildCmdAsSudoArgs (bin, args, token, sudoOptions) {
 
   // inject the token into your command to detect successful sudo,
   // such : sudo sh -c 'echo THETOKEN && your command'
-  var sudoArgs = [ '-S', 'sh', '-c', 'echo "' + token + '" && ' + command ];
+  var sudoArgs = [ '-S', 'sh', '-c', 'echo -n "' + token + '" && ' + command ];
   // some various sudo options, see man sudo
   if(sudoOptions) {
     if (sudoOptions.k) sudoArgs.unshift('-k')
