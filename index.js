@@ -192,7 +192,7 @@ function buildCmdAsSudoArgs (bin, args, token, sudoOptions) {
   // linearize the command bin to -> sudo sh -c 'your command'
   var command = '' + bin + ' ';
   args.forEach(function (arg){
-    command += arg.match(/\s/) ? '"' + arg + '"' : arg;
+    command += (''+arg).match(/\s/) ? '"' + arg + '"' : arg;
     command += ' ';
   })
 
