@@ -174,14 +174,11 @@ function sudo(bin, args, options) {
         child.stderr && child.stderr.pipe(process.stderr);
 
       fake.stdin && fake.stdin.resume();
-
-      if(origStdio==='ignore' || origStdio[0]==='ignore')
-        child.stdin.end();
     })
-    
+
     child.once('challenged', function () {
       if(origStdio==='ignore' || origStdio[0]==='ignore')
-        child.stdin.end();
+        child.stdin && child.stdin.end();
     })
 
     return fake;
