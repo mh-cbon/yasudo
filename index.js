@@ -174,6 +174,14 @@ function sudo(bin, args, options) {
         child.stderr && child.stderr.pipe(process.stderr);
 
       fake.stdin && fake.stdin.resume();
+
+      if(origStdio==='ignore' || origStdio[0]==='ignore')
+        child.stdin.end();
+    })
+    
+    child.once('challenged', function () {
+      if(origStdio==='ignore' || origStdio[0]==='ignore')
+        child.stdin.end();
     })
 
     return fake;
@@ -235,6 +243,7 @@ function normalizeStdio (stdio) {
     else {
       if (stdio[2]!=='pipe') stdio[2] = 'pipe'
       if (stdio[1]!=='pipe') stdio[1] = 'pipe'
+      if (stdio[0]==='ignore') stdio[0] = 'pipe'
       ret = stdio;
     }
   } else {
