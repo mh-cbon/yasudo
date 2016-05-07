@@ -70,22 +70,6 @@ for sure,
 # Todo
 
 - support `ipc` `stdio` setting
-- write an even better version, something which would just
-wrap the streams of a child and listen to them to fulfill the challenge
-```js
-var child = spawn('sh', ['-c', 'ls -al && sudo ls'])
-require('themodule')(child)
-```
-To make it possible, the module should
-- pause child streams,
-- determine the prompt of sudo (run a pseudo sudo ls on the remote to find about it)
-- resume the streams
-- listen on all out streams (stdout / stderr / FD2+) for the found prompt
-- then answer the challenge when it find the prompt on listened streams.
-
-Doing so
-- would make it compatible with [ssh2](https://github.com/mscdex/ssh2)
-- would give the end user even more liberty
 
 # Tests
 
