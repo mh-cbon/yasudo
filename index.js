@@ -19,8 +19,11 @@ function sudo(bin, args, options) {
     var token = process.env['THEPREDEFINEDTOKEN'] || randomstring.generate();
     var hasSolvedTheChallenge = false;
 
-    var options = options || {};
+    args = args || [];
+    options = options || {};
+
     debug('options %j', options);
+
     var origStdio = JSON.parse(JSON.stringify(options.stdio || false))
     debug('origStdio %j', origStdio);
     options.stdio = normalizeStdio(options.stdio);
