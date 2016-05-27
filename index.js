@@ -44,16 +44,19 @@ function sudo(bin, args, options) {
     fake.stdin && fake.stdin.pause();
 
     // Listener to catch the token on stdout, tells us that sudo was successful
-    var detectToken = detectString({once:true, token: token})
+    var detectToken = detectString({once:true, token: token+'\n'})
     detectToken.on('error', erroredStream('detectToken'))
     detectToken.once('foundToken', function () {
       debug('hasSolvedTheChallenge %j', true)
       hasSolvedTheChallenge = true;
       child.emit('challenged', hasSolvedTheChallenge)
       child.emit('success')
-      child.stdout.unpipe(detectToken);
+      //child.stdout.unpipe(detectToken);
     })
-    child.stdout.pipe(detectToken);
+    child.stdout = child.stdout.pipe(detectToken);
+
+    if(!origStdio || origStdio==='pipe' || origStdio[1]==='pipe')
+      child.stdout && fake.stdout && child.stdout.pipe(fake.stdout);
 
     var hasEnded = false; // track failure/ending of sudo
     var allDone = function () {
@@ -164,12 +167,10 @@ function sudo(bin, args, options) {
       child.stdout && child.stdout.unpipe(process.stdout);
       child.stderr && child.stderr.unpipe(process.stderr);
 
-      if(!origStdio || origStdio==='pipe' || origStdio[0]==='pipe')
-        child.stdin && fake.stdin && fake.stdin.pipe(child.stdin);
-      if(!origStdio || origStdio==='pipe' || origStdio[1]==='pipe')
-        child.stdout && fake.stdout && child.stdout.pipe(fake.stdout);
       if(!origStdio || origStdio==='pipe' || origStdio[2]==='pipe')
         child.stderr && fake.stderr && child.stderr.pipe(fake.stderr);
+      if(!origStdio || origStdio==='pipe' || origStdio[0]==='pipe')
+        child.stdin && fake.stdin && fake.stdin.pipe(child.stdin);
 
       if(origStdio==='inherit' || origStdio[1]==='inherit')
         child.stdout && child.stdout.pipe(process.stdout);
@@ -198,7 +199,7 @@ function buildCmdAsSudoArgs (bin, args, token, sudoOptions) {
 
   // inject the token into your command to detect successful sudo,
   // such : sudo sh -c 'echo THETOKEN && your command'
-  var sudoArgs = [ '-S', 'sh', '-c', 'echo -n "' + token + '" && ' + command ];
+  var sudoArgs = [ '-S', 'sh', '-c', 'echo "' + token + '" && ' + command ];
   // some various sudo options, see man sudo
   if(sudoOptions) {
     if (sudoOptions.k) sudoArgs.unshift('-k')
